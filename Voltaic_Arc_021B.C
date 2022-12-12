@@ -17,12 +17,16 @@ BITS_T falg;
 #define STATE		falg.bit0	//0-关；1-开
 #define KEY_OK	falg.bit1
 #define Rader		falg.bit2
+#define Break		falg.bit3
 
 #define eSTATE 	0
 #define	eSetAddr	1
 #define eRader		2
 
 u8 ReadAPin;
+extern volatile u16 pwm_d;
+
+u16 WorkTim = 0;
 
 void Test(void);
 
@@ -126,7 +130,7 @@ void InitRam(void)
     STATE = EEPROMread(eSTATE);
 	Rader = EEPROMread(eRader);
 
-	KEY_OK = Fault;
+	KEY_OK = True;
 }
 
 //主函数
@@ -140,26 +144,64 @@ int main(void)
 	
 	InitRam();
 
+	PWM_OFF();
+	pwm_d = 0;
+	PWM_INITIAL(0);
+    
+	//Test();
+
 	while(1)
     {
-		DelayMs(10);	
+		DelayMs(10);	//消抖
        
-		if(KEY == 0)
+		if(KEY == 1)
         {
             KEY_OK = True;
+            
+			LED = 1;
+            
+            if(Break)
+            {
+                Break = 0;
+                
+				PWM_12kHz();
+                PWM_ON();
+                DelayMs(50);
+                PWM_20kHz();
+			}
+            
+			if(++WorkTim >= 500)
+            {
+				KEY_OK = Fault;
+				WorkTim = 0;
+
+				Break = 1;
+
+				LED = 0; 
+				PWM_OFF();
+                
+				PA_Level_Change_INITIAL();
+				SLEEP(); 
+			}
 		}
 		else	//检测松手有效
         {
 			if(KEY_OK == True)
             {
                 KEY_OK = Fault;
+                WorkTim = 0;
+                
+				Break = 1;
+
+				LED = 0; 
+				PWM_OFF();
+                
+				PA_Level_Change_INITIAL();
+				SLEEP(); 
             }
         }
         
 		//Test();
-        
-		PA_Level_Change_INITIAL();
-		SLEEP(); 
 	}
 	return 0;
 }
@@ -181,12 +223,11 @@ void Test(void)
 		for(u8 FCount=0;FCount<100;FCount++)	//输出100次波形	
 		{
 			LED = 1;
-			DelayMs(10);  					//10ms 
+			DelayMs(10);  					//10ms
 			LED = 0;
 			DelayMs(10); 
 		}
 	}
 }
-
 
 //===========================================================
